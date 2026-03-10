@@ -1,4 +1,11 @@
+import HeroSection from './HeroSection';
+
 function App() {
-  return <h1>Hello Micheal, fresh React app reset!</h1>;
+  return (
+    <div>
+      <HeroSection />
+    </div>
+  );
 }
+
 export default App;
