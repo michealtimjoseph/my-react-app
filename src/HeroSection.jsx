@@ -22,6 +22,8 @@ const styles = `
   .hero-root {
     position: relative;
     min-height: 100vh;
+    width: 100vw;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -35,6 +37,9 @@ const styles = `
 
   /* ── Grid canvas ── */
   .grid-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
     position: absolute;
     inset: 0;
     z-index: 0;
