@@ -365,6 +365,37 @@ const styles = `
     95%         { transform:translate(3px, -1px); opacity:0.8; }
     98%         { transform:translate(-2px, 1px); opacity:0.5; }
   }
+
+  /* ── Responsive adjustments ── */
+  @media (max-width: 1024px) {
+    .hero-title { font-size: clamp(40px, 7vw, 72px); }
+    .hero-subtitle { max-width: 420px; }
+    .stats-row { gap: 32px; }
+    .corner { width: 40px; height: 40px; }
+  }
+
+  @media (max-width: 768px) {
+    .nav { flex-direction: column; gap: 12px; padding: 12px 20px; align-items: center; }
+    .nav-links { flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-title { font-size: clamp(32px, 9vw, 56px); }
+    .hero-subtitle { font-size: 12px; line-height: 1.6; margin: 20px auto 32px; }
+    .stats-row { flex-direction: column; gap: 24px; bottom: 24px; left: 50%; transform: translateX(-50%); }
+    .stat-divider { display: none; }
+    .scroll-indicator { right: 16px; bottom: 24px; }
+    .corner { display: none; }
+    .nav-status { display: none; }
+  }
+
+  @media (max-width: 480px) {
+    .cta-group { flex-direction: column; gap: 12px; }
+    .btn-primary, .btn-secondary { width: 100%; text-align: center; padding-left: 18px; padding-right: 18px; }
+    .nav-logo { font-size: 11px; }
+    .nav-links a { font-size: 10px; }
+    .hero-content { padding: 0 18px; }
+    .hero-title { line-height: 0.95; }
+    .hero-subtitle { margin: 16px auto 24px; }
+    .scroll-label { display: none; }
+  }
 `;
 
 /* ── Animated grid canvas ── */
@@ -373,50 +404,60 @@ function GridCanvas() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
     let raf;
     let t = 0;
 
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      // Use devicePixelRatio for crisper canvas on high-DPI screens
+      const dpr = window.devicePixelRatio || 1;
+      const W = Math.max(1, Math.floor(window.innerWidth));
+      const H = Math.max(1, Math.floor(window.innerHeight));
+      canvas.style.width = W + "px";
+      canvas.style.height = H + "px";
+      canvas.width = Math.floor(W * dpr);
+      canvas.height = Math.floor(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
     window.addEventListener("resize", resize);
 
     const draw = () => {
-      const W = canvas.width, H = canvas.height;
+      const W = canvas.width / (window.devicePixelRatio || 1);
+      const H = canvas.height / (window.devicePixelRatio || 1);
       ctx.clearRect(0, 0, W, H);
 
       // Perspective grid
       const horizon = H * 0.58;
-      const vp = { x: W / 2, y: horizon };
+      // Slightly raise horizon on narrow screens for better composition
+      const narrow = W < 600;
+      const vp = { x: W / 2, y: horizon + (narrow ? -30 : 0) };
       const cols = 16;
       const rows = 14;
-      const speed = 0.4;
+      const speed = 0.45;
       const offset = (t * speed) % (H / rows);
 
-      ctx.strokeStyle = "rgba(0,255,231,0.07)";
-      ctx.lineWidth = 1;
-
-      // Vertical lines
+      // Base vertical lines
       for (let i = 0; i <= cols; i++) {
         const xBase = (W / cols) * i;
         const xTop = vp.x + (xBase - vp.x) * 0.01;
         ctx.beginPath();
-        ctx.moveTo(xTop, horizon);
+        ctx.strokeStyle = "rgba(0,255,231,0.06)";
+        ctx.lineWidth = 1;
+        ctx.moveTo(xTop, vp.y);
         ctx.lineTo(xBase, H);
         ctx.stroke();
       }
 
-      // Horizontal lines
+      // Horizontal lines with perspective easing
       for (let j = 0; j <= rows; j++) {
         const yFrac = j / rows;
-        const yPos = horizon + (H - horizon) * Math.pow(yFrac, 1.8) + offset * Math.pow(yFrac, 1.8);
+        const yPos = vp.y + (H - vp.y) * Math.pow(yFrac, 1.8) + offset * Math.pow(yFrac, 1.8);
         if (yPos > H) continue;
         const xLeft = vp.x + (0 - vp.x) * (1 - yFrac * 0.99);
         const xRight = vp.x + (W - vp.x) * (1 - yFrac * 0.99);
-        const alpha = yFrac * 0.18;
+        const alpha = Math.min(0.22, yFrac * 0.18 + 0.02);
         ctx.strokeStyle = `rgba(0,255,231,${alpha})`;
         ctx.beginPath();
         ctx.moveTo(xLeft, yPos);
@@ -425,28 +466,28 @@ function GridCanvas() {
       }
 
       // Horizon glow
-      const grd = ctx.createLinearGradient(0, horizon - 60, 0, horizon + 40);
+      const grd = ctx.createLinearGradient(0, vp.y - 60, 0, vp.y + 40);
       grd.addColorStop(0, "transparent");
       grd.addColorStop(0.5, "rgba(0,255,231,0.06)");
       grd.addColorStop(1, "transparent");
       ctx.fillStyle = grd;
-      ctx.fillRect(0, horizon - 60, W, 100);
+      ctx.fillRect(0, vp.y - 60, W, 100);
 
-      // Stars
-      ctx.fillStyle = "rgba(200,221,232,0.5)";
+      // Stars (positioned relative to horizon)
+      ctx.fillStyle = "rgba(200,221,232,0.6)";
       const stars = [
-        [0.1,0.05],[0.25,0.12],[0.4,0.03],[0.6,0.08],[0.75,0.15],
-        [0.88,0.04],[0.15,0.22],[0.55,0.18],[0.9,0.25],[0.32,0.28],
-        [0.68,0.30],[0.05,0.38],[0.82,0.35],[0.47,0.40],[0.22,0.44],
+        [0.08,0.06],[0.22,0.12],[0.38,0.04],[0.58,0.09],[0.74,0.16],
+        [0.86,0.05],[0.14,0.22],[0.52,0.18],[0.92,0.25],[0.30,0.28],
+        [0.66,0.30],[0.05,0.38],[0.80,0.35],[0.46,0.40],[0.20,0.44],
       ];
-      stars.forEach(([sx, sy]) => {
-        const blink = 0.4 + 0.6 * Math.abs(Math.sin(t * 0.5 + sx * 10));
-        ctx.globalAlpha = blink * 0.7;
-        ctx.fillRect(sx * W, sy * horizon, 1.5, 1.5);
+      stars.forEach(([sx, sy], idx) => {
+        const blink = 0.45 + 0.55 * Math.abs(Math.sin(t * 0.45 + sx * 8 + idx));
+        ctx.globalAlpha = blink * 0.8;
+        ctx.fillRect(sx * W, sy * vp.y, 1.5, 1.5);
       });
       ctx.globalAlpha = 1;
 
-      t += 0.016;
+      t += 0.018;
       raf = requestAnimationFrame(draw);
     };
 
@@ -461,23 +502,24 @@ function GridCanvas() {
 function Counter({ target, suffix = "" }) {
   const [count, setCount] = useState(0);
   useEffect(() => {
-    const duration = 1800;
+    const duration = 1600;
     const start = performance.now();
+    let rafId;
     const tick = (now) => {
       const progress = Math.min((now - start) / duration, 1);
       const ease = 1 - Math.pow(1 - progress, 3);
       setCount(Math.floor(ease * target));
-      if (progress < 1) requestAnimationFrame(tick);
+      if (progress < 1) rafId = requestAnimationFrame(tick);
     };
-    const delay = setTimeout(() => requestAnimationFrame(tick), 2400);
-    return () => clearTimeout(delay);
+    const delay = setTimeout(() => rafId = requestAnimationFrame(tick), 2200);
+    return () => { clearTimeout(delay); cancelAnimationFrame(rafId); };
   }, [target]);
   return <>{count}{suffix}</>;
 }
 
 /* ── Corner bracket SVG ── */
 const BracketCorner = () => (
-  <svg viewBox="0 0 48 48" fill="none">
+  <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
     <path d="M2 24 L2 2 L24 2" stroke="#00ffe7" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
@@ -487,7 +529,7 @@ export default function HeroSection() {
   return (
     <>
       <style>{styles}</style>
-      <section className="hero-root">
+      <section className="hero-root" role="region" aria-label="Hero - Beyond Horizon Protocol">
 
         <GridCanvas />
         <div className="scanlines" />
@@ -495,18 +537,18 @@ export default function HeroSection() {
 
         {/* Corners */}
         {["tl","tr","bl","br"].map(cls => (
-          <div key={cls} className={`corner ${cls}`}><BracketCorner /></div>
+          <div key={cls} className={`corner ${cls}`} aria-hidden="true"><BracketCorner /></div>
         ))}
 
         {/* Nav */}
-        <nav className="nav">
+        <nav className="nav" aria-label="Main navigation">
           <div className="nav-logo">NXVS // SYS</div>
-          <ul className="nav-links">
+          <ul className="nav-links" role="list">
             {["Protocol","Systems","Deploy","Docs"].map(l => (
-              <li key={l}><a href="#">{l}</a></li>
+              <li key={l}><a href="#" aria-label={l}>{l}</a></li>
             ))}
           </ul>
-          <div className="nav-status">
+          <div className="nav-status" aria-hidden="true">
             <div className="status-dot" />
             ALL SYSTEMS NOMINAL
           </div>
@@ -514,9 +556,9 @@ export default function HeroSection() {
 
         {/* Main content */}
         <div className="hero-content">
-          <div className="system-tag">INITIALIZING // BUILD 2.9.4</div>
+          <div className="system-tag" aria-hidden="true">INITIALIZING // BUILD 2.9.4</div>
 
-          <h1 className="hero-title">
+          <h1 className="hero-title" aria-label="Beyond Horizon Protocol">
             <div className="line"><span>BEYOND</span></div>
             <div className="line">
               <span className="glitch accent" data-text="HORIZON">HORIZON</span>
@@ -530,14 +572,14 @@ export default function HeroSection() {
             no framework has gone before.
           </p>
 
-          <div className="cta-group">
-            <button className="btn-primary">_ INITIALIZE</button>
-            <button className="btn-secondary">VIEW DOCS →</button>
+          <div className="cta-group" role="group" aria-label="Primary actions">
+            <button className="btn-primary" aria-label="Initialize">_ INITIALIZE</button>
+            <button className="btn-secondary" aria-label="View docs">VIEW DOCS →</button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="stats-row">
+        <div className="stats-row" aria-hidden="true">
           <div className="stat">
             <div className="stat-value"><Counter target={99} suffix="." /><span>9%</span></div>
             <div className="stat-label">Uptime SLA</div>
@@ -555,7 +597,7 @@ export default function HeroSection() {
         </div>
 
         {/* Scroll indicator */}
-        <div className="scroll-indicator">
+        <div className="scroll-indicator" aria-hidden="true">
           <div className="scroll-label">Scroll</div>
           <div className="scroll-line" />
         </div>
